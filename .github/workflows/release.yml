@@ -1,6 +1,12 @@
 name: Release Obsidian plugin
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build and publish"
+        required: true
+        default: "2.0.4"
   push:
     tags:
       - "*"
@@ -15,6 +21,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -41,10 +49,13 @@ jobs:
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
+          tag="$RELEASE_TAG"
+          test "$(node -p "require('./dist/manifest.json').version")" = "$tag"
 
           gh release create "$tag" \
+            --verify-tag \
             --title="$tag" \
             --generate-notes \
             dist/main.js dist/manifest.json dist/styles.css
