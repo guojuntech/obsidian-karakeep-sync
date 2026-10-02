@@ -29,7 +29,7 @@ const bookmark: HoarderBookmark = {
 };
 function plugin() {
   const p = Object.create(HoarderPlugin.prototype) as HoarderPlugin;
-  p.settings = { ...DEFAULT_SETTINGS, useCustomTemplate: true, customTemplate: BODY_ONLY_TEMPLATE };
+  p.settings = { ...DEFAULT_SETTINGS };
   return p;
 }
 test("registers content_markdown in context and validates the body-only template", () => {
@@ -76,4 +76,24 @@ test("renders only the body without querying unrelated assets", async () => {
   expect(md).toContain("## Article\n\nFull body");
   expect(md).not.toContain("## Notes");
   expect(md).not.toContain("screenshot");
+});
+
+test.each([
+  ["/", ["root.md", "folder/nested.md", "folder-other/other.md"]],
+  ["/folder/", ["folder/nested.md"]],
+])("finds local bookmark notes in sync folder %s", async (syncFolder, expected) => {
+  const p = plugin();
+  p.settings.syncFolder = syncFolder;
+  const exists = jest.fn(async () => true);
+  Object.assign(p, {
+    app: {
+      vault: {
+        adapter: { exists },
+        getMarkdownFiles: () => ["root.md", "folder/nested.md", "folder-other/other.md"].map(path => ({ path })),
+      },
+      metadataCache: { getFileCache: (file: { path: string }) => ({ frontmatter: { bookmark_id: file.path } }) },
+    },
+  });
+  expect([...((await p.getLocalBookmarkFiles()).values())]).toEqual(expected);
+  if (syncFolder === "/") expect(exists).not.toHaveBeenCalled();
 });

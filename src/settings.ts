@@ -48,23 +48,23 @@ export interface HoarderSettings {
 
 export const DEFAULT_SETTINGS: HoarderSettings = {
   apiKey: "",
-  apiEndpoint: "https://api.hoarder.app/api/v1",
-  syncFolder: "Hoarder",
-  attachmentsFolder: "Hoarder/attachments",
-  syncIntervalMinutes: 60,
+  apiEndpoint: "https://<placeholder>/api/v1",
+  syncFolder: "/",
+  attachmentsFolder: "/assets",
+  syncIntervalMinutes: 1440,
   lastSyncTimestamp: 0,
-  updateExistingFiles: false,
+  updateExistingFiles: true,
   excludeArchived: true,
   onlyFavorites: false,
-  syncNotesToHoarder: true,
-  syncHighlights: true,
+  syncNotesToHoarder: false,
+  syncHighlights: false,
   onlyBookmarksWithHighlights: false,
   excludedTags: [],
   includedTags: [],
   downloadAssets: true,
-  downloadBannerImages: true,
-  downloadScreenshots: true,
-  downloadPdfArchives: true,
+  downloadBannerImages: false,
+  downloadScreenshots: false,
+  downloadPdfArchives: false,
   downloadFullPageArchives: false,
   syncDeletions: false,
   deletionAction: "delete",
@@ -74,9 +74,9 @@ export const DEFAULT_SETTINGS: HoarderSettings = {
   archivedBookmarkAction: "delete",
   archivedBookmarkTag: "archived",
   archivedBookmarkFolder: "Hoarder/archived",
-  useObsidianRequest: false,
-  useCustomTemplate: false,
-  customTemplate: "",
+  useObsidianRequest: true,
+  useCustomTemplate: true,
+  customTemplate: BODY_ONLY_TEMPLATE,
 };
 
 class FolderSuggest extends AbstractInputSuggest<TFolder> {
@@ -170,10 +170,10 @@ export class HoarderSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Api endpoint")
-      .setDesc("Hoarder API endpoint URL (default: https://api.karakeep.app/api/v1)")
+      .setDesc("Karakeep API endpoint URL. Replace <placeholder> with your server host.")
       .addText((text) =>
         text
-          .setPlaceholder("Enter API endpoint")
+          .setPlaceholder("https://<placeholder>/api/v1")
           .setValue(this.plugin.settings.apiEndpoint)
           .onChange(async (value) => {
             this.plugin.settings.apiEndpoint = value;

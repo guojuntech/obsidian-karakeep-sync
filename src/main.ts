@@ -60,9 +60,10 @@ export default class HoarderPlugin extends Plugin {
     // Register file modification event
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
+        const folderPath = this.settings.syncFolder.replace(/^\/+|\/+$/g, "");
         if (
           this.settings.syncNotesToHoarder &&
-          file.path.startsWith(this.settings.syncFolder) &&
+          (!folderPath || file.path.startsWith(`${folderPath}/`)) &&
           file.path.endsWith(".md") &&
           file instanceof TFile
         ) {
@@ -214,15 +215,15 @@ export default class HoarderPlugin extends Plugin {
 
   async getLocalBookmarkFiles(): Promise<Map<string, string>> {
     const bookmarkFiles = new Map<string, string>();
-    const folderPath = this.settings.syncFolder;
+    const folderPath = this.settings.syncFolder.replace(/^\/+|\/+$/g, "");
 
-    if (!(await this.app.vault.adapter.exists(folderPath))) {
+    if (folderPath && !(await this.app.vault.adapter.exists(folderPath))) {
       return bookmarkFiles;
     }
 
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
-      if (file.path.startsWith(folderPath) && file.path.endsWith(".md")) {
+      if ((!folderPath || file.path.startsWith(`${folderPath}/`)) && file.path.endsWith(".md")) {
         const metadata = this.app.metadataCache.getFileCache(file)?.frontmatter;
         const bookmarkId = metadata?.bookmark_id;
         if (bookmarkId) {
@@ -368,8 +369,8 @@ export default class HoarderPlugin extends Plugin {
 
     try {
       // Create sync folder if it doesn't exist
-      const folderPath = this.settings.syncFolder;
-      if (!(await this.app.vault.adapter.exists(folderPath))) {
+      const folderPath = this.settings.syncFolder.replace(/^\/+|\/+$/g, "");
+      if (folderPath && !(await this.app.vault.adapter.exists(folderPath))) {
         await this.app.vault.createFolder(folderPath);
       }
 

@@ -75,6 +75,10 @@ function createBookmark(overrides: Partial<HoarderBookmark> = {}): HoarderBookma
 function createSettings(overrides: Partial<HoarderSettings> = {}): HoarderSettings {
   return {
     ...DEFAULT_SETTINGS,
+    // These tests exercise explicitly enabled generic bookmark-asset downloads.
+    downloadBannerImages: true,
+    downloadScreenshots: true,
+    downloadPdfArchives: true,
     apiEndpoint: "https://karakeep.example.com/api/v1",
     attachmentsFolder: "Hoarder/attachments",
     downloadAssets: true,
