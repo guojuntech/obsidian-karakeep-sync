@@ -1,73 +1,132 @@
 name: Release Obsidian plugin
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - manifest.json
+      - package.json
+      - package-lock.json
+      - versions.json
+      - .github/workflows/release.yml
+      - scripts/package-release.mjs
+    tags: ['[0-9]*.[0-9]*.[0-9]*']
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build and publish"
-        required: true
-        default: "2.0.4"
-  push:
-    tags:
-      - "*"
+        description: 'Existing tag to rebuild (leave empty to publish the selected branch version)'
+        required: false
+        default: ''
+
+concurrency:
+  group: plugin-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
 
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22.x"
+          node-version: '22.x'
+          cache: npm
+
+      - name: Validate version and release target
+        id: version
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const read = path => JSON.parse(fs.readFileSync(path, 'utf8'));
+          const manifest = read('manifest.json');
+          const pkg = read('package.json');
+          const lock = read('package-lock.json');
+          if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error('Expected version x.y.z');
+          if ([pkg.version, lock.version, lock.packages[''].version].some(v => v !== manifest.version)) {
+            throw new Error('manifest, package and lockfile versions must match');
+          }
+          console.log(manifest.version);
+          NODE
+          )
+          echo "tag=$version" >> "$GITHUB_OUTPUT"
+          if [ -n "$REQUESTED_TAG" ] && [ "$REQUESTED_TAG" != "$version" ]; then
+            echo "Requested tag must match manifest version" >&2
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "Pushed tag must match manifest version" >&2
+            exit 1
+          fi
+          # A duplicate push/manual retry must not replace an already published release.
+          releases=$(gh api --paginate "repos/$GH_REPO/releases" --jq '.[].tag_name')
+          if printf '%s\n' "$releases" | grep -Fxq "$version"; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Release $version already exists; nothing to publish."
+          else
+            if git show-ref --verify --quiet "refs/tags/$version"; then
+              test "$(git rev-parse "$version^{commit}")" = "$(git rev-parse HEAD)" || {
+                echo "Version tag already points to a different commit; bump the version" >&2
+                exit 1
+              }
+            fi
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install dependencies
-        run: npm install
+        if: steps.version.outputs.publish == 'true'
+        run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Test
+        if: steps.version.outputs.publish == 'true'
+        run: npm test -- --runInBand
 
-      - name: Build plugin
+      - name: Build
+        if: steps.version.outputs.publish == 'true'
         run: npm run build
 
-      - name: Package manual installation archive
-        run: |
-          python3 - <<'PYZIP'
-          import json
-          from pathlib import Path
-          from zipfile import ZipFile, ZIP_DEFLATED
-          version = json.loads(Path("dist/manifest.json").read_text())["version"]
-          with ZipFile(f"karakeep-sync-{version}.zip", "w", ZIP_DEFLATED) as archive:
-              for name in ("main.js", "manifest.json", "styles.css"):
-                  archive.write(Path("dist") / name, f"hoarder-sync/{name}")
-          PYZIP
+      - name: Package release
+        if: steps.version.outputs.publish == 'true'
+        run: node scripts/package-release.mjs
 
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+      - name: Preserve build artifacts
+        if: steps.version.outputs.publish == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          subject-path: |
+          name: karakeep-sync-${{ steps.version.outputs.tag }}
+          path: |
             dist/main.js
             dist/manifest.json
             dist/styles.css
+            dist/karakeep-sync-*.zip
+          if-no-files-found: error
 
-      - name: Create release
+      - name: Create tag and publish release
+        if: steps.version.outputs.publish == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          tag="$RELEASE_TAG"
-          test "$(node -p "require('./dist/manifest.json').version")" = "$tag"
-
-          gh release create "$tag" \
+          if ! git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          gh release create "$RELEASE_TAG" \
             --verify-tag \
-            --title="$tag" \
+            --title "$RELEASE_TAG" \
             --generate-notes \
-            dist/main.js dist/manifest.json dist/styles.css "karakeep-sync-$tag.zip"
+            --latest \
+            dist/main.js dist/manifest.json dist/styles.css "dist/karakeep-sync-$RELEASE_TAG.zip"

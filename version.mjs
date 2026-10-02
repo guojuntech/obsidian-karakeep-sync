@@ -34,21 +34,32 @@ try {
   writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + "\n");
   console.log(`Updated ${packagePath} to version ${newVersion}`);
 
+  // Keep npm ci's lockfile in sync with the release version.
+  const lockPath = "package-lock.json";
+  const lock = JSON.parse(readFileSync(lockPath, "utf8"));
+  lock.version = newVersion;
+  lock.packages[""].version = newVersion;
+  writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
+  const versionsPath = "versions.json";
+  const versions = JSON.parse(readFileSync(versionsPath, "utf8"));
+  versions[newVersion] = manifest.minAppVersion;
+  writeFileSync(versionsPath, JSON.stringify(versions, null, 2) + "\n");
+
   // Git commands
-  execSync("git add manifest.json package.json");
+  execSync("git add manifest.json package.json package-lock.json versions.json");
   execSync(`git commit -m "chore: bump version to ${newVersion}"`);
   execSync(`git tag -a ${newVersion} -m "Version ${newVersion}"`);
-  console.log(`Created git tag v${newVersion}`);
+  console.log(`Created git tag ${newVersion}`);
 
   console.log("\nNext steps:");
   console.log("1. Push the changes: git push");
-  console.log("2. Push the tag: git push origin --tags");
+  console.log(`2. Push the tag: git push origin ${newVersion}`);
 
   const answer = prompt("Do this automatically? (y/n) ").toLowerCase();
   if (answer === "y" || answer === "yes") {
     console.log("\nPushing changes and tags...");
     execSync("git push");
-    execSync("git push origin --tags");
+    execSync(`git push origin ${newVersion}`);
     console.log("Done!");
   }
 } catch (error) {
