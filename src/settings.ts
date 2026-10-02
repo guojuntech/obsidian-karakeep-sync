@@ -135,7 +135,7 @@ export class HoarderSettingTab extends PluginSettingTab {
 
   private updateSyncButton = (isSyncing: unknown) => {
     if (this.syncButton) {
-      this.syncButton.setButtonText(isSyncing ? "Syncing..." : "Sync Now");
+      this.syncButton.setButtonText(isSyncing ? `Syncing... ${this.plugin.syncProgressMessage || ""}` : "Sync Now");
       this.syncButton.setDisabled(!!isSyncing);
     }
   };
@@ -765,7 +765,7 @@ export class HoarderSettingTab extends PluginSettingTab {
       .setDesc("Sync bookmarks now")
       .addButton((button) => {
         this.syncButton = button
-          .setButtonText(this.plugin.isSyncing ? "Syncing..." : "Sync Now")
+          .setButtonText(this.plugin.isSyncing ? `Syncing... ${this.plugin.syncProgressMessage || ""}` : "Sync Now")
           .setDisabled(this.plugin.isSyncing)
           .onClick(async () => {
             const result = await this.plugin.syncBookmarks();

@@ -1,4 +1,4 @@
-import { requestUrl } from "obsidian";
+import { requestWithTimeout } from "./request-timeout";
 
 // Type definitions for the Hoarder API responses
 export interface HoarderTag {
@@ -108,7 +108,7 @@ export class HoarderApiClient {
     };
 
     try {
-      const response = await requestUrl({
+      const response = await requestWithTimeout({
         url: url.toString(),
         method,
         headers,
@@ -151,6 +151,7 @@ export class HoarderApiClient {
   async getAllHighlights(): Promise<HoarderHighlight[]> {
     const allHighlights: HoarderHighlight[] = [];
     let cursor: string | undefined;
+    const seenCursors = new Set<string>();
 
     do {
       const data = await this.getHighlights({
@@ -160,6 +161,10 @@ export class HoarderApiClient {
 
       allHighlights.push(...(data.highlights || []));
       cursor = data.nextCursor || undefined;
+      if (cursor) {
+        if (seenCursors.has(cursor)) throw new Error("Karakeep returned a repeated highlights cursor");
+        seenCursors.add(cursor);
+      }
     } while (cursor);
 
     return allHighlights;
@@ -174,7 +179,7 @@ export class HoarderApiClient {
     };
 
     try {
-      const response = await requestUrl({ url, method: "GET", headers });
+      const response = await requestWithTimeout({ url, method: "GET", headers });
 
       if (response.status >= 400) {
         throw new Error(`HTTP ${response.status}: ${response.text || "Unknown error"}`);

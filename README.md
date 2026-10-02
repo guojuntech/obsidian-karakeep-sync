@@ -204,3 +204,7 @@ Each release includes `main.js`, `manifest.json`, and `styles.css` as separate a
 ### Defaults for new installations (1.0.2)
 
 The API endpoint starts as `https://<placeholder>/api/v1`; replace the host and enter your API key. CORS bypass is enabled. Notes sync to the vault root (`/`), attachments to `/assets`, and the interval is 0 (automatic sync disabled, including startup sync; use Sync Now or the Sync Bookmarks command). Existing files are updated; note uploads and highlights are disabled. Banner images, screenshots, and PDF archives are disabled. Custom templates and attachment downloads are enabled, with the body-only template preselected. Saved settings take precedence when upgrading. Set **Sync interval** to `0` in existing installations to disable automatic sync; a positive value enables startup and periodic sync.
+
+### Sync progress and network failures (1.0.3)
+
+Article-body sync requests one article per page and shows fetch/save progress on the sync button. Network requests time out after 90 seconds; a timeout stops the run, restores Sync Now, and preserves the existing note if its body or attachments could not be downloaded. The underlying Obsidian network operation cannot be aborted, but its late result is ignored. Previously completed notes remain saved. Full bookmark inventories are skipped when deletion and archive handling are disabled. Repeated pagination cursors report an error instead of looping forever.

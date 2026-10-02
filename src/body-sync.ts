@@ -1,5 +1,6 @@
 import { sha256 } from "@noble/hashes/sha256";
-import { App, requestUrl } from "obsidian";
+import { App } from "obsidian";
+import { requestWithTimeout } from "./request-timeout";
 import Turndown from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 
@@ -59,7 +60,7 @@ async function localize(
       absolute = settings.apiEndpoint.replace(/\/$/, "") + "/assets/" + assetId;
       headers.Authorization = "Bearer " + settings.apiKey;
     }
-    const response = await requestUrl({ url: absolute, headers });
+    const response = await requestWithTimeout({ url: absolute, headers });
     if (response.status >= 400) throw new Error("Attachment HTTP " + response.status);
     mime = (response.headers["content-type"] || "").split(";")[0];
     if (mime === "text/html") throw new Error("Attachment returned an HTML page");

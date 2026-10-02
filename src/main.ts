@@ -32,6 +32,7 @@ export default class HoarderPlugin extends Plugin {
   settings!: HoarderSettings;
   syncIntervalId!: number;
   isSyncing: boolean = false;
+  syncProgressMessage: string = "";
   skippedFiles: number = 0;
   events: Events = new Events();
   private modificationTimeout: number | null = null;
@@ -134,7 +135,7 @@ export default class HoarderPlugin extends Plugin {
       template.includes("content_html") || template.includes("content_markdown");
 
     return await this.client.getBookmarks({
-      limit: needsHtmlContent ? Math.min(limit, 5) : limit,
+      limit: needsHtmlContent ? Math.min(limit, 1) : limit,
       cursor: cursor || undefined,
       archived: this.settings.excludeArchived ? false : undefined,
       favourited: this.settings.onlyFavorites ? true : undefined,
@@ -149,6 +150,7 @@ export default class HoarderPlugin extends Plugin {
 
     const allBookmarks: HoarderBookmark[] = [];
     let cursor: string | undefined;
+    const seenCursors = new Set<string>();
 
     do {
       const data = await this.client.getBookmarks({
@@ -160,6 +162,10 @@ export default class HoarderPlugin extends Plugin {
 
       allBookmarks.push(...(data.bookmarks || []));
       cursor = data.nextCursor || undefined;
+      if (cursor) {
+        if (seenCursors.has(cursor)) throw new Error("Karakeep returned a repeated pagination cursor");
+        seenCursors.add(cursor);
+      }
     } while (cursor);
 
     return allBookmarks;
@@ -216,7 +222,13 @@ export default class HoarderPlugin extends Plugin {
 
   private setSyncing(value: boolean) {
     this.isSyncing = value;
+    if (!value) this.syncProgressMessage = "";
     this.events.trigger("sync-state-change", value);
+  }
+
+  private reportSyncProgress(message: string) {
+    this.syncProgressMessage = message;
+    this.events.trigger("sync-state-change", this.isSyncing);
   }
 
   async getLocalBookmarkFiles(): Promise<Map<string, string>> {
@@ -383,9 +395,11 @@ export default class HoarderPlugin extends Plugin {
       // Get existing local bookmark files for deletion detection
       const localBookmarkFiles = await this.getLocalBookmarkFiles();
 
-      // Fetch all bookmarks to distinguish between active, archived, and deleted
-      const activeBookmarks = await this.fetchAllBookmarks(false); // Only active bookmarks
-      const allBookmarks = await this.fetchAllBookmarks(true); // All bookmarks including archived
+      // Full inventories are only needed for deletion/archive handling.
+      this.reportSyncProgress("Checking bookmarks");
+      const needsInventory = this.settings.syncDeletions || this.settings.handleArchivedBookmarks;
+      const activeBookmarks = needsInventory ? await this.fetchAllBookmarks(false) : [];
+      const allBookmarks = needsInventory ? await this.fetchAllBookmarks(true) : [];
 
       const activeBookmarkIds = new Set(activeBookmarks.map((b) => b.id));
       const archivedBookmarkIds = new Set(
@@ -417,14 +431,23 @@ export default class HoarderPlugin extends Plugin {
       }
 
       let cursor: string | undefined;
+      let processed = 0;
+      const seenCursors = new Set<string>();
 
       do {
+        this.reportSyncProgress(`Fetching article (${processed} processed)`);
         const result = await this.fetchBookmarks(cursor);
         const bookmarks = result.bookmarks || [];
         cursor = result.nextCursor || undefined;
+        if (cursor) {
+          if (seenCursors.has(cursor)) throw new Error("Karakeep returned a repeated pagination cursor");
+          seenCursors.add(cursor);
+        }
 
         // Process each bookmark
         for (const bookmark of bookmarks) {
+          processed++;
+          this.reportSyncProgress(`Saving article (${processed} processed)`);
           // Skip if filtering by highlights and bookmark has no highlights
           if (
             this.settings.onlyBookmarksWithHighlights &&

@@ -55,7 +55,7 @@ test.each(["content_markdown", "content_html"])(
     Object.assign(p, { client: { getBookmarks } });
     await p.fetchBookmarks("cursor");
     expect(getBookmarks).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 5, cursor: "cursor", includeContent: true })
+      expect.objectContaining({ limit: 1, cursor: "cursor", includeContent: true })
     );
   }
 );
@@ -130,4 +130,33 @@ describe("automatic sync scheduling", () => {
     jest.advanceTimersByTime(10 * 60 * 1000);
     expect(sync).toHaveBeenCalledTimes(2);
   });
+});
+
+test("a failed request clears Syncing and permits a successful retry", async () => {
+  const p = plugin();
+  p.settings.apiKey = "test-key";
+  const getBookmarks = jest.fn()
+    .mockRejectedValueOnce(new Error("Network request timed out"))
+    .mockResolvedValue({ bookmarks: [], nextCursor: null });
+  Object.assign(p, { client: { getBookmarks }, events: { trigger: jest.fn() }, app: { vault: {} } });
+  jest.spyOn(p, "getLocalBookmarkFiles").mockResolvedValue(new Map());
+  jest.spyOn(p, "saveSettings").mockResolvedValue(undefined);
+  const inventory = jest.spyOn(p, "fetchAllBookmarks");
+  const errors = jest.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    expect(await p.syncBookmarks()).toEqual({ success: false, message: expect.stringContaining("timed out") });
+    expect(p.isSyncing).toBe(false);
+    expect(p.syncProgressMessage).toBe("");
+    expect((await p.syncBookmarks()).success).toBe(true);
+    expect(p.isSyncing).toBe(false);
+    expect(inventory).not.toHaveBeenCalled();
+  } finally { errors.mockRestore(); }
+});
+
+test("repeated inventory pagination cursors fail instead of looping forever", async () => {
+  const p = plugin();
+  const getBookmarks = jest.fn().mockResolvedValue({ bookmarks: [], nextCursor: "same" });
+  Object.assign(p, { client: { getBookmarks } });
+  await expect(p.fetchAllBookmarks()).rejects.toThrow("repeated pagination cursor");
+  expect(getBookmarks).toHaveBeenCalledTimes(2);
 });
