@@ -51,7 +51,7 @@ export const DEFAULT_SETTINGS: HoarderSettings = {
   apiEndpoint: "https://<placeholder>/api/v1",
   syncFolder: "/",
   attachmentsFolder: "/assets",
-  syncIntervalMinutes: 1440,
+  syncIntervalMinutes: 0,
   lastSyncTimestamp: 0,
   updateExistingFiles: true,
   excludeArchived: true,
@@ -248,14 +248,14 @@ export class HoarderSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Sync interval")
-      .setDesc("How often to sync (in minutes)")
+      .setDesc("How often to sync (in minutes). Set to 0 to disable automatic sync, including startup sync.")
       .addText((text) =>
         text
-          .setPlaceholder("60")
+          .setPlaceholder("0")
           .setValue(String(this.plugin.settings.syncIntervalMinutes))
           .onChange(async (value) => {
             const numValue = parseInt(value);
-            if (!isNaN(numValue) && numValue > 0) {
+            if (!isNaN(numValue) && numValue >= 0) {
               this.plugin.settings.syncIntervalMinutes = numValue;
               await this.plugin.saveSettings();
               this.plugin.startPeriodicSync();

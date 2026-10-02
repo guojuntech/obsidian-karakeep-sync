@@ -44,7 +44,7 @@ Ensure your CORS policy is set to allow requests from your Obsidian instance. In
 - **Api endpoint**: The Karakeep API endpoint (default: https://api.karakeep.app/api/v1)
 - **Sync folder**: The folder where bookmark notes will be created (default: "Hoarder")
 - **Attachments folder**: The folder where bookmark images will be saved (default: "Hoarder/attachments")
-- **Sync interval**: How often to sync in minutes (default: 60)
+- **Sync interval**: How often to sync in minutes (default: 0; automatic sync disabled)
 - **Update existing files**: Whether to update or skip existing bookmark files (default: false)
 - **Exclude archived**: Exclude archived bookmarks from sync (default: true)
 - **Only favorites**: Only sync favorited bookmarks (default: false)
@@ -201,6 +201,6 @@ To publish the next release, update the versions in `manifest.json`, `package.js
 
 Each release includes `main.js`, `manifest.json`, and `styles.css` as separate assets for BRAT, plus `karakeep-sync-VERSION.zip` containing a `hoarder-sync/` directory for manual installation. Duplicate triggers skip existing releases. If a version's tag points to a different commit, the workflow stops instead of moving it; publish a new version or manually rerun against the existing tag.
 
-### Defaults for new installations (1.0.1)
+### Defaults for new installations (1.0.2)
 
-The API endpoint starts as `https://<placeholder>/api/v1`; replace the host and enter your API key. CORS bypass is enabled. Notes sync to the vault root (`/`), attachments to `/assets`, and the automatic interval is 1440 minutes. Existing files are updated; note uploads and highlights are disabled. Banner images, screenshots, and PDF archives are disabled. Custom templates and attachment downloads are enabled, with the body-only template preselected. Saved settings take precedence when upgrading.
+The API endpoint starts as `https://<placeholder>/api/v1`; replace the host and enter your API key. CORS bypass is enabled. Notes sync to the vault root (`/`), attachments to `/assets`, and the interval is 0 (automatic sync disabled, including startup sync; use Sync Now or the Sync Bookmarks command). Existing files are updated; note uploads and highlights are disabled. Banner images, screenshots, and PDF archives are disabled. Custom templates and attachment downloads are enabled, with the body-only template preselected. Saved settings take precedence when upgrading. Set **Sync interval** to `0` in existing installations to disable automatic sync; a positive value enables startup and periodic sync.

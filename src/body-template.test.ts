@@ -97,3 +97,37 @@ test.each([
   expect([...((await p.getLocalBookmarkFiles()).values())]).toEqual(expected);
   if (syncFolder === "/") expect(exists).not.toHaveBeenCalled();
 });
+
+
+describe("automatic sync scheduling", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  test("zero cancels an existing timer without starting or scheduling sync", () => {
+    const p = plugin();
+    const sync = jest.spyOn(p, "syncBookmarks").mockResolvedValue({ success: true, message: "OK" });
+    p.syncIntervalId = window.setInterval(() => { void p.syncBookmarks(); }, 1000);
+    p.settings.syncIntervalMinutes = 0;
+    p.startPeriodicSync();
+    jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+    expect(sync).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test("a positive interval enables startup and periodic sync", () => {
+    const p = plugin();
+    const sync = jest.spyOn(p, "syncBookmarks").mockResolvedValue({ success: true, message: "OK" });
+    p.settings.syncIntervalMinutes = 10;
+    p.startPeriodicSync();
+    expect(sync).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    expect(sync).toHaveBeenCalledTimes(2);
+    p.settings.syncIntervalMinutes = 0;
+    p.startPeriodicSync();
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    expect(sync).toHaveBeenCalledTimes(2);
+  });
+});

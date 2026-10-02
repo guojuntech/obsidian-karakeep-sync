@@ -106,6 +106,12 @@ export default class HoarderPlugin extends Plugin {
     // Clear existing interval if any
     if (this.syncIntervalId) {
       window.clearInterval(this.syncIntervalId);
+      this.syncIntervalId = 0;
+    }
+
+    // Zero disables both startup and periodic automatic sync.
+    if (!Number.isFinite(this.settings.syncIntervalMinutes) || this.settings.syncIntervalMinutes <= 0) {
+      return;
     }
 
     // Convert minutes to milliseconds
