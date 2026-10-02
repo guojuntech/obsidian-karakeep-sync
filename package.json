@@ -28,8 +28,10 @@
     "@trivago/prettier-plugin-sort-imports": "^6",
     "@types/jest": "^30",
     "@types/node": "^25",
+    "@types/turndown": "^5.0.6",
     "esbuild": "^0.28",
     "jest": "^30",
+    "jest-environment-jsdom": "^30.5.2",
     "obsidian": "^1.12",
     "prettier": "^3",
     "prompt-sync": "^4",
@@ -39,6 +41,9 @@
   "dependencies": {
     "@codemirror/state": "^6",
     "@codemirror/view": "^6",
-    "eta": "^4.5.1"
+    "@noble/hashes": "^1.8.0",
+    "eta": "^4.5.1",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
   }
 }

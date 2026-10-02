@@ -1,0 +1,79 @@
+/** @jest-environment jsdom */
+import { TextEncoder } from "util";
+
+import { HoarderBookmark } from "./hoarder-client";
+import HoarderPlugin from "./main";
+import { DEFAULT_SETTINGS } from "./settings";
+import {
+  BODY_ONLY_TEMPLATE,
+  buildTemplateContext,
+  renderTemplate,
+  validateTemplate,
+} from "./template-renderer";
+
+Object.assign(globalThis, { TextEncoder });
+const bookmark: HoarderBookmark = {
+  id: "article",
+  createdAt: "2026-10-01T00:00:00Z",
+  modifiedAt: null,
+  archived: false,
+  favourited: false,
+  taggingStatus: null,
+  tags: [],
+  content: {
+    type: "link",
+    url: "https://example.org",
+    htmlContent: "<h2>Article</h2><p>Full body</p>",
+  },
+  assets: [{ id: "unrelated", assetType: "screenshot" }],
+};
+function plugin() {
+  const p = Object.create(HoarderPlugin.prototype) as HoarderPlugin;
+  p.settings = { ...DEFAULT_SETTINGS, useCustomTemplate: true, customTemplate: BODY_ONLY_TEMPLATE };
+  return p;
+}
+test("registers content_markdown in context and validates the body-only template", () => {
+  expect(validateTemplate(BODY_ONLY_TEMPLATE).valid).toBe(true);
+  const context = buildTemplateContext(
+    bookmark,
+    "Title",
+    [],
+    "",
+    null,
+    DEFAULT_SETTINGS,
+    "## Body"
+  );
+  expect(context.content_markdown).toBe("## Body");
+  expect(renderTemplate(BODY_ONLY_TEMPLATE, context)).toContain("## Body");
+});
+test.each(["content_markdown", "content_html"])(
+  "requests full body for %s templates using small API pages",
+  async (variable) => {
+    const p = plugin();
+    p.settings.customTemplate = `<%= it.${variable} %>`;
+    const getBookmarks = jest.fn(async () => ({ bookmarks: [], nextCursor: null }));
+    Object.assign(p, { client: { getBookmarks } });
+    await p.fetchBookmarks("cursor");
+    expect(getBookmarks).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 5, cursor: "cursor", includeContent: true })
+    );
+  }
+);
+test("preserves list-only API behavior when no full-content template is selected", async () => {
+  const p = plugin();
+  p.settings.useCustomTemplate = false;
+  const getBookmarks = jest.fn(async () => ({ bookmarks: [], nextCursor: null }));
+  Object.assign(p, { client: { getBookmarks } });
+  await p.fetchBookmarks();
+  expect(getBookmarks).toHaveBeenCalledWith(
+    expect.objectContaining({ limit: 100, includeContent: undefined })
+  );
+});
+test("renders only the body without querying unrelated assets", async () => {
+  const p = plugin();
+  Object.assign(p, { app: { vault: {} } });
+  const md = await p.formatBookmarkAsMarkdown(bookmark, "Title");
+  expect(md).toContain("## Article\n\nFull body");
+  expect(md).not.toContain("## Notes");
+  expect(md).not.toContain("screenshot");
+});

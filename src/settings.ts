@@ -1,9 +1,17 @@
 import { EditorView } from "@codemirror/view";
-import { AbstractInputSuggest, App, ButtonComponent, Notice, PluginSettingTab, Setting, TFolder } from "obsidian";
+import {
+  AbstractInputSuggest,
+  App,
+  ButtonComponent,
+  Notice,
+  PluginSettingTab,
+  Setting,
+  TFolder,
+} from "obsidian";
 
 import HoarderPlugin from "./main";
 import { createTemplateEditor, setEditorValue } from "./template-editor";
-import { DEFAULT_TEMPLATE, validateTemplate } from "./template-renderer";
+import { BODY_ONLY_TEMPLATE, DEFAULT_TEMPLATE, validateTemplate } from "./template-renderer";
 
 export interface HoarderSettings {
   apiKey: string;
@@ -353,6 +361,26 @@ export class HoarderSettingTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
+      .setName("Article body and referenced attachments")
+      .setDesc(
+        "Use a Markdown body template, download only referenced attachments, and update existing files. Works on desktop and mobile. Disables note uploads and highlights."
+      )
+      .addButton((button) =>
+        button.setButtonText("Use body-only template").onClick(async () => {
+          Object.assign(this.plugin.settings, {
+            useCustomTemplate: true,
+            customTemplate: BODY_ONLY_TEMPLATE,
+            updateExistingFiles: true,
+            downloadAssets: true,
+            syncNotesToHoarder: false,
+            syncHighlights: false,
+          });
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+
+    new Setting(containerEl)
       .setName("Use custom template")
       .setDesc("Enable a custom template for bookmark note generation")
       .addToggle((toggle) =>
@@ -398,7 +426,13 @@ export class HoarderSettingTab extends PluginSettingTab {
       addVarLine(refContent, ["it.noteBlock"], "(editable, wrapped in comment markers)");
       addVarLine(refContent, ["it.summary", "it.created_at", "it.modified_at"]);
       addVarLine(refContent, ["it.content_type"], '("link", "text", "asset")');
-      addVarLine(refContent, ["it.content_html", "it.author", "it.archived", "it.favourited"]);
+      addVarLine(refContent, [
+        "it.content_markdown",
+        "it.content_html",
+        "it.author",
+        "it.archived",
+        "it.favourited",
+      ]);
       addVarLine(refContent, ["it.tags"], "(string array)");
       addVarLine(refContent, ["it.hoarder_url", "it.visit_link"]);
 
@@ -410,7 +444,11 @@ export class HoarderSettingTab extends PluginSettingTab {
       refContent.createEl("strong", { text: "Assets" });
       addVarLine(refContent, ["it.assets.content"], "(rendered embeds)");
       addVarLine(refContent, ["it.assets.banner", "it.assets.screenshot", "it.assets.image"]);
-      addVarLine(refContent, ["it.assets.full_page_archive", "it.assets.pdf_archive", "it.assets.video"]);
+      addVarLine(refContent, [
+        "it.assets.full_page_archive",
+        "it.assets.pdf_archive",
+        "it.assets.video",
+      ]);
       addVarLine(refContent, ["it.assets.additional"], "(string array)");
 
       refContent.createEl("br");
@@ -422,7 +460,11 @@ export class HoarderSettingTab extends PluginSettingTab {
 
       refContent.createEl("br");
       refContent.createEl("strong", { text: "Helper functions" });
-      addVarLine(refContent, ["it.escapeYaml(str)", "it.escapeMarkdownPath(str)", "it.formatDate(iso)"]);
+      addVarLine(refContent, [
+        "it.escapeYaml(str)",
+        "it.escapeMarkdownPath(str)",
+        "it.formatDate(iso)",
+      ]);
 
       const editorContainer = containerEl.createDiv({ cls: "hoarder-template-editor" });
 

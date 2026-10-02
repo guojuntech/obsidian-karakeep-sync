@@ -103,6 +103,7 @@ Use `<%= it.variable %>` for output and `<% if (condition) { %>` for logic.
 | `it.created_at` | `string` | ISO 8601 creation date |
 | `it.modified_at` | `string \| null` | ISO 8601 modification date |
 | `it.content_type` | `string` | `"link"`, `"text"`, or `"asset"` |
+| `it.content_markdown` | `string \| null` | Full article body as Markdown; referenced attachments are localized when downloads are enabled |
 | `it.content_html` | `string \| null` | Raw HTML content (sanitized) |
 | `it.archived` | `boolean` | Whether bookmark is archived |
 | `it.favourited` | `boolean` | Whether bookmark is favorited |
@@ -169,3 +170,25 @@ Use `<%= it.variable %>` for output and `<% if (condition) { %>` for logic.
 ## License
 
 MIT 
+
+## Full article body and referenced attachments
+
+In Settings → Karakeep (Hoarder) Sync → Note Template, click **Use body-only template**. This selects the template below, enables downloads and existing-file updates, and disables note uploads and highlight output:
+
+```eta
+---
+bookmark_id: "<%= it.bookmark_id %>"
+title: <%= it.yaml.title %>
+url: <%= it.yaml.url %>
+---
+
+# <%= it.title %>
+
+<%= it.content_markdown || "" %>
+```
+
+This fork adds `it.content_markdown`; copying this template to the upstream plugin is insufficient. Install the built `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` in your vault's `.obsidian/plugins/hoarder-sync/` folder and reload the plugin. Configure your own API endpoint/key and note/attachment folders. Both desktop and mobile builds use the same bundled code, without Node filesystem, crypto or Buffer dependencies. The mobile behavior is covered by browser-environment tests; a physical Android device has not been tested.
+
+When a custom template uses `content_markdown`, the plugin requests full content and converts the article HTML with Markdown headings, lists, tables and fenced code blocks. It extracts inline images and downloads referenced images, media and attachment links, then rewrites them relative to the note folder. Ordinary article links remain links. This mode bypasses the general bookmark-asset downloader, so unrelated banner images, screenshots and page archives are not downloaded even if their toggles are enabled. Other template fields remain available; the body-only template omits summaries, notes and highlights. `it.content_html` keeps its existing behavior.
+
+Text bookmarks retain their Markdown and localize inline image/attachment links. File bookmarks embed their primary asset. Content hashes deduplicate inline attachments, and URL hashes let later syncs reuse remote attachments. Turning off **Download assets** retains remote/data references. If Karakeep has no article body, or a referenced download fails, sync reports an error and leaves that note unchanged instead of writing an empty/incomplete body. Earlier successful notes in that run remain updated. Template validation warnings about `original_note` and `## Notes` concern two-way note sync, which the body-only preset disables.

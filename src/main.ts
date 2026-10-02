@@ -1,6 +1,7 @@
-import { Events, Notice, Plugin, TFile } from "obsidian";
+import { Events, Notice, Plugin, TFile, normalizePath } from "obsidian";
 
 import { processBookmarkAssets } from "./asset-handler";
+import { bodyMarkdown } from "./body-sync";
 import { getBookmarkTitle } from "./bookmark-utils";
 import {
   DeletionSettings,
@@ -122,10 +123,11 @@ export default class HoarderPlugin extends Plugin {
     }
 
     const template = this.settings.useCustomTemplate ? this.settings.customTemplate : "";
-    const needsHtmlContent = template.includes("content_html");
+    const needsHtmlContent =
+      template.includes("content_html") || template.includes("content_markdown");
 
     return await this.client.getBookmarks({
-      limit,
+      limit: needsHtmlContent ? Math.min(limit, 5) : limit,
       cursor: cursor || undefined,
       archived: this.settings.excludeArchived ? false : undefined,
       favourited: this.settings.onlyFavorites ? true : undefined,
@@ -447,7 +449,9 @@ export default class HoarderPlugin extends Plugin {
           }
 
           const title = getBookmarkTitle(bookmark);
-          const fileName = `${folderPath}/${sanitizeFileName(title, bookmark.createdAt)}.md`;
+          const fileName = normalizePath(
+            `${folderPath}/${sanitizeFileName(title, bookmark.createdAt)}.md`
+          );
 
           // Get highlights for this bookmark from pre-fetched map
           const highlights = highlightsByBookmarkId.get(bookmark.id) || [];
@@ -554,13 +558,15 @@ export default class HoarderPlugin extends Plugin {
     title: string,
     highlights?: HoarderHighlight[]
   ): Promise<string> {
-    const { content: assetContent, frontmatter: assetsFm } = await processBookmarkAssets(
-      this.app,
-      bookmark,
-      title,
-      this.client,
-      this.settings
-    );
+    const usesMarkdownBody =
+      this.settings.useCustomTemplate && this.settings.customTemplate.includes("content_markdown");
+    // Article-body templates must not download unrelated bookmark assets.
+    const contentMarkdown = usesMarkdownBody
+      ? await bodyMarkdown(bookmark, this.app, this.settings)
+      : null;
+    const { content: assetContent, frontmatter: assetsFm } = usesMarkdownBody
+      ? { content: "", frontmatter: null }
+      : await processBookmarkAssets(this.app, bookmark, title, this.client, this.settings);
 
     const context = buildTemplateContext(
       bookmark,
@@ -568,7 +574,8 @@ export default class HoarderPlugin extends Plugin {
       highlights,
       assetContent,
       assetsFm,
-      this.settings
+      this.settings,
+      contentMarkdown
     );
 
     const template =

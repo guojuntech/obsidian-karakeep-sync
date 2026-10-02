@@ -40,3 +40,5 @@ export class AbstractInputSuggest<T> {
   selectSuggestion(_item: T) {}
   close() {}
 }
+
+export const normalizePath = (path: string) => path.replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
